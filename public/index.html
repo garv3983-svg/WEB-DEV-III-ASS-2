@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Student Management System</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: #eef1f5;
+    margin: 0;
+    padding: 30px 15px;
+    color: #222;
+  }
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    padding: 25px 30px 35px;
+  }
+  h1 {
+    font-size: 22px;
+    margin-bottom: 4px;
+    color: #1f3a5f;
+  }
+  p.subtitle {
+    margin-top: 0;
+    color: #666;
+    font-size: 14px;
+  }
+  form {
+    display: flex;
+    gap: 10px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+  }
+  form input {
+    flex: 1;
+    min-width: 140px;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  form button {
+    padding: 8px 18px;
+    background: #1f3a5f;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  form button:hover { background: #16324f; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px;
+    border-bottom: 1px solid #e2e2e2;
+    font-size: 14px;
+  }
+  th {
+    background: #f5f7fa;
+    color: #444;
+  }
+  td.actions button {
+    margin-right: 6px;
+    padding: 4px 9px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .edit-btn { background: #ffb020; color: #fff; }
+  .delete-btn { background: #d9534f; color: #fff; }
+
+  #statusMsg {
+    margin-top: 12px;
+    font-size: 13px;
+    min-height: 18px;
+  }
+  #statusMsg.error { color: #c0392b; }
+  #statusMsg.success { color: #2e7d32; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Student Management System</h1>
+  <p class="subtitle">Simple frontend to test the Student CRUD REST API</p>
+
+  <form id="studentForm">
+    <input type="hidden" id="studentId" />
+    <input type="text" id="name" placeholder="Student name" required />
+    <input type="text" id="course" placeholder="Course" required />
+    <button type="submit" id="submitBtn">Add Student</button>
+  </form>
+
+  <div id="statusMsg"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Course</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="studentTableBody">
+      <!-- rows added by JS -->
+    </tbody>
+  </table>
+</div>
+
+<script>
+  const API_URL = "/students";
+
+  const form = document.getElementById("studentForm");
+  const idField = document.getElementById("studentId");
+  const nameField = document.getElementById("name");
+  const courseField = document.getElementById("course");
+  const submitBtn = document.getElementById("submitBtn");
+  const tableBody = document.getElementById("studentTableBody");
+  const statusMsg = document.getElementById("statusMsg");
+
+  function showStatus(message, type) {
+    statusMsg.textContent = message;
+    statusMsg.className = type || "";
+    setTimeout(() => {
+      statusMsg.textContent = "";
+      statusMsg.className = "";
+    }, 3000);
+  }
+
+  async function loadStudents() {
+    try {
+      const res = await fetch(API_URL);
+      const result = await res.json();
+      renderTable(result.data || []);
+    } catch (err) {
+      showStatus("Could not load students. Is the server running?", "error");
+    }
+  }
+
+  function renderTable(students) {
+    tableBody.innerHTML = "";
+    students.forEach((s) => {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${s.id}</td>
+        <td>${s.name}</td>
+        <td>${s.course}</td>
+        <td class="actions">
+          <button class="edit-btn" onclick="editStudent(${s.id}, '${s.name}', '${s.course}')">Edit</button>
+          <button class="delete-btn" onclick="deleteStudent(${s.id})">Delete</button>
+        </td>
+      `;
+      tableBody.appendChild(row);
+    });
+  }
+
+  function editStudent(id, name, course) {
+    idField.value = id;
+    nameField.value = name;
+    courseField.value = course;
+    submitBtn.textContent = "Update Student";
+  }
+
+  function resetForm() {
+    idField.value = "";
+    nameField.value = "";
+    courseField.value = "";
+    submitBtn.textContent = "Add Student";
+  }
+
+  async function deleteStudent(id) {
+    if (!confirm("Delete this student?")) return;
+    try {
+      const res = await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+      const result = await res.json();
+      if (res.ok) {
+        showStatus(result.message, "success");
+        loadStudents();
+      } else {
+        showStatus(result.message, "error");
+      }
+    } catch (err) {
+      showStatus("Something went wrong while deleting", "error");
+    }
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const id = idField.value;
+    const body = JSON.stringify({
+      name: nameField.value.trim(),
+      course: courseField.value.trim(),
+    });
+
+    try {
+      let res;
+      if (id) {
+        res = await fetch(`${API_URL}/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body,
+        });
+      } else {
+        res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+        });
+      }
+
+      const result = await res.json();
+
+      if (res.ok) {
+        showStatus(result.message, "success");
+        resetForm();
+        loadStudents();
+      } else {
+        showStatus(result.message, "error");
+      }
+    } catch (err) {
+      showStatus("Something went wrong while saving", "error");
+    }
+  });
+
+  loadStudents();
+</script>
+
+</body>
+</html>
